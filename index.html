@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#101a20">
+<title>Frontline RTS — Mobile</title>
+<style>
+:root{--bg:#101a20;--panel:#18272e;--line:#39505a;--text:#eaf2f3;--muted:#a6bbc1;--green:#70e0a0;--gold:#f0c76b;--red:#ff7373}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;touch-action:none}
+#game{position:fixed;inset:0;width:100%;height:100%;display:block;background:#253a31}
+#top{position:fixed;top:env(safe-area-inset-top,0);left:0;right:0;display:flex;gap:7px;align-items:center;padding:8px;pointer-events:none}
+.stat{background:#111c22eF;border:1px solid #40545c;border-radius:10px;padding:7px 10px;min-width:70px;box-shadow:0 3px 12px #0003}
+.stat small{display:block;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.08em}
+.stat b{font-size:15px}
+#mission{margin-left:auto;max-width:44%;font-size:11px;color:#d5e2e5;line-height:1.2}
+#hint{position:fixed;left:10px;top:76px;max-width:65%;background:#111c22d9;border:1px solid #40545c;border-radius:9px;padding:7px 9px;font-size:11px;color:#d9e5e7;pointer-events:none}
+#bottom{position:fixed;left:0;right:0;bottom:0;padding:8px 8px calc(8px + env(safe-area-inset-bottom,0));background:linear-gradient(0deg,#0c1419f5,#0c1419df 80%,transparent);display:flex;flex-direction:column;gap:7px}
+#selection{font-size:12px;color:#b9cbd0;min-height:16px;padding-left:3px}
+.actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+button{border:1px solid #435a64;border-radius:10px;background:linear-gradient(#263941,#1a2a31);color:var(--text);font-weight:700;font-size:12px;min-height:48px;padding:7px 4px;box-shadow:0 2px 0 #0a1013;touch-action:manipulation}
+button:active{transform:translateY(1px);background:#36525b}
+button span{display:block;color:#9db7bf;font-weight:500;font-size:10px;margin-top:3px}
+button:disabled{opacity:.35}
+#toast{position:fixed;left:50%;top:43%;transform:translate(-50%,-50%);background:#101a20ee;border:1px solid #6d8a94;border-radius:12px;padding:13px 17px;text-align:center;font-weight:800;display:none;max-width:85%;box-shadow:0 10px 40px #0008;z-index:5}
+#overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0b1418b8;padding:20px;z-index:6}
+.modal{max-width:420px;width:100%;background:#17262d;border:1px solid #4a626c;border-radius:18px;padding:22px;box-shadow:0 20px 60px #0009}
+.modal h1{margin:0 0 8px;font-size:25px;letter-spacing:.02em}
+.modal p{color:#b7c8cd;font-size:14px;line-height:1.5}
+.modal button{width:100%;margin-top:8px;background:linear-gradient(#2d7958,#20563f);min-height:48px}
+.pill{display:inline-block;border:1px solid #55716d;border-radius:99px;padding:4px 8px;color:#91e8b5;font-size:11px;margin-bottom:10px}
+@media (orientation:portrait){#mission{max-width:34%}.stat{min-width:61px;padding:6px 8px}.stat b{font-size:13px}.actions{grid-template-columns:repeat(4,minmax(0,1fr))}button{font-size:11px;min-height:45px}#hint{top:69px}}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="top">
+ <div class="stat"><small>Créditos</small><b id="credits">600</b></div>
+ <div class="stat"><small>Renda</small><b id="income">+12/s</b></div>
+ <div class="stat"><small>Exército</small><b id="army">3</b></div>
+ <div class="stat" id="mission"><b>OPERAÇÃO FRONTEIRA</b><br>Destrua o quartel-general vermelho.</div>
+</div>
+<div id="hint">Toque numa unidade para selecionar. Toque no terreno para mover ou atacar.</div>
+<div id="bottom">
+ <div id="selection">Nenhuma unidade selecionada</div>
+ <div class="actions">
+  <button id="buildMine">⛏ Extratora<span>150 créditos</span></button>
+  <button id="buildBarracks">▦ Quartel<span>250 créditos</span></button>
+  <button id="buildTurret">⌖ Torreta<span>200 créditos</span></button>
+  <button id="trainInf">＋ Infantaria<span>100 créditos</span></button>
+  <button id="trainTank">▰ Tanque<span>300 créditos</span></button>
+  <button id="rally">⚑ Reagrupar<span>Selecionados</span></button>
+  <button id="repair">✚ Reparar<span>80 créditos</span></button>
+  <button id="pause">Ⅱ Pausar<span>Jogo</span></button>
+ </div>
+</div>
+<div id="toast"></div>
+<div id="overlay"><div class="modal">
+ <div class="pill">RTS TÁTICO • VERSÃO MOBILE</div>
+ <h1>FRONTLINE RTS</h1>
+ <p>Comande uma força moderna, expanda sua economia e destrua a base inimiga.</p>
+ <p><b>Controles:</b> toque nas tropas para selecionar; toque no mapa para mover ou atacar. Use os botões para construir e produzir unidades. Arraste com dois dedos para deslocar o mapa.</p>
+ <button id="start">INICIAR OPERAÇÃO</button>
+ <p style="font-size:11px;margin-bottom:0">Protótipo web jogável • progresso não é salvo</p>
+</div></div>
+<script>
+(()=>{
+const canvas=document.getElementById('game'),ctx=canvas.getContext('2d');
+const $=id=>document.getElementById(id);
+let W=0,H=0,dpr=1, worldW=1900,worldH=1300, cam={x:0,y:0}, running=false, paused=false, ended=false;
+let credits=600, income=12, nextId=1, units=[], buildings=[], particles=[], last=0, aiTimer=0, gameTime=0, selected=[], placement=null, toastTimer=0;
+const colors={blue:'#5ab9e8',blueDark:'#246a89',red:'#ed6b63',redDark:'#8e3434',green:'#77dba0',gold:'#efc56b'};
+function resize(){dpr=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;canvas.width=Math.floor(W*dpr);canvas.height=Math.floor(H*dpr);canvas.style.width=W+'px';canvas.style.height=H+'px';ctx.setTransform(dpr,0,0,dpr,0,0);cam.x=Math.max(0,Math.min(cam.x,worldW-W));cam.y=Math.max(0,Math.min(cam.y,worldH-H));}
+window.addEventListener('resize',resize);resize();
+function entity(type,team,x,y){let cfg={inf:{hp:70,speed:75,range:120,damage:9,rate:.65,r:10,cost:100},tank:{hp:240,speed:48,range:190,damage:30,rate:1.05,r:15,cost:300},hq:{hp:950,r:34},mine:{hp:250,r:20},barracks:{hp:420,r:25},turret:{hp:300,r:18,range:210,damage:18,rate:.75}}[type];return {id:nextId++,type,team,x,y,hp:cfg.hp,maxHp:cfg.hp,speed:cfg.speed||0,range:cfg.range||0,damage:cfg.damage||0,rate:cfg.rate||1,r:cfg.r,tx:x,ty:y,target:null,cool:Math.random()*.3,alive:true,build:0};}
+function setup(){units=[];buildings=[];particles=[];selected=[];credits=600;income=12;nextId=1;gameTime=0;aiTimer=0;ended=false;paused=false;
+ buildings.push(entity('hq','blue',220,worldH/2),entity('mine','blue',300,worldH/2-105),entity('barracks','blue',315,worldH/2+105),entity('hq','red',worldW-230,worldH/2));
+ units.push(entity('inf','blue',410,worldH/2-40),entity('inf','blue',410,worldH/2+10),entity('tank','blue',460,worldH/2+65));
+ units.push(entity('inf','red',worldW-390,worldH/2-50),entity('inf','red',worldW-390,worldH/2+20),entity('tank','red',worldW-440,worldH/2+70));
+ cam.x=0;cam.y=Math.max(0,worldH/2-H/2);updateUI();}
+function all(){return units.concat(buildings)}
+function alive(e){return e.alive&&e.hp>0}
+function notify(s){let t=$('toast');t.textContent=s;t.style.display='block';toastTimer=2.2}
+function cost(n){if(credits<n){notify('Créditos insuficientes');return false}credits-=n;return true}
+function updateUI(){$('credits').textContent=Math.floor(credits);$('income').textContent='+'+income+'/s';$('army').textContent=units.filter(u=>u.team==='blue'&&alive(u)).length;
+ $('selection').textContent=selected.length?selected.length+' selecionado(s) • '+selected.map(e=>e.type==='inf'?'Infantaria':e.type==='tank'?'Tanque':e.type==='hq'?'QG':e.type==='mine'?'Extratora':e.type==='barracks'?'Quartel':'Torreta').slice(0,3).join(', '):placement?'Toque no mapa para posicionar '+(placement==='mine'?'a extratora':placement==='barracks'?'o quartel':'a torreta'):'Nenhuma unidade selecionada';
+}
+function screenToWorld(x,y){return {x:x+cam.x,y:y+cam.y}}
+function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
+function nearestEnemy(e){let list=all().filter(o=>o.team!==e.team&&alive(o)&&o.type!=='mine'&&o.type!=='barracks');list.sort((a,b)=>dist(e,a)-dist(e,b));return list[0]}
+function targetAt(p,team){return all().filter(e=>alive(e)&&e.team!==team&&dist(e,p)<e.r+25).sort((a,b)=>dist(a,p)-dist(b,p))[0]}
+function addParticle(x,y,color){for(let i=0;i<7;i++)particles.push({x,y,vx:(Math.random()-.5)*70,vy:(Math.random()-.5)*70,t:.35+Math.random()*.45,color})}
+function damage(e,n){e.hp-=n;addParticle(e.x,e.y,e.team==='red'?colors.red:colors.blue);if(e.hp<=0){e.alive=false;addParticle(e.x,e.y,'#f6c76b');if(e.type==='hq'){ended=true;running=false;notify(e.team==='red'?'VITÓRIA! QG inimigo destruído.':'DERROTA! Seu QG foi destruído.');setTimeout(()=>showEnd(e.team==='red'),700)}}}
+function showEnd(win){$('overlay').style.display='flex';$('overlay').innerHTML=`<div class="modal"><div class="pill">${win?'MISSÃO CONCLUÍDA':'MISSÃO FALHOU'}</div><h1>${win?'VITÓRIA':'DERROTA'}</h1><p>${win?'O quartel-general inimigo foi neutralizado.':'Seu quartel-general foi destruído. Reorganize suas forças e tente novamente.'}</p><button id="restart">JOGAR NOVAMENTE</button></div>`;$('restart').onclick=()=>{setup();$('overlay').style.display='none';running=true;last=performance.now();requestAnimationFrame(loop)}}
+function nearestBlueHQ(){return buildings.find(b=>b.team==='blue'&&b.type==='hq'&&alive(b))}
+function train(type){let b=buildings.find(b=>b.team==='blue'&&b.type==='barracks'&&alive(b));if(!b){notify('Construa um quartel primeiro');return}let c=type==='inf'?100:300;if(!cost(c))return;let u=entity(type,'blue',b.x+35,b.y+30);u.tx=b.x+80;u.ty=b.y+30;units.push(u);updateUI()}
+function place(type){let c={mine:150,barracks:250,turret:200}[type];if(!cost(c))return;placement=type;selected=[];notify('Toque num local livre do mapa');updateUI()}
+function nearestTargetForTurret(e){let en=units.filter(u=>u.team!==e.team&&alive(u)&&dist(e,u)<e.range).sort((a,b)=>dist(e,a)-dist(e,b))[0];return en}
+function update(dt){if(!running||paused||ended)return;gameTime+=dt;credits+=income*dt;aiTimer+=dt;
+ for(let b of buildings){if(!alive(b))continue;if(b.type==='mine'&&b.team==='blue'){}if(b.type==='turret'){b.cool-=dt;let t=nearestTargetForTurret(b);if(t&&b.cool<=0){damage(t,b.damage);b.cool=b.rate}}}
+ for(let u of units){if(!alive(u))continue;u.cool-=dt;
+   let enemy=nearestEnemy(u);
+   if(u.target&&!alive(u.target))u.target=null;
+   if(u.target&&u.target.team!==u.team&&dist(u,u.target)<u.range+u.target.r+8){if(u.cool<=0){damage(u.target,u.damage);u.cool=u.rate}continue}
+   if(enemy&&dist(u,enemy)<u.range+enemy.r+20){u.target=enemy;if(dist(u,enemy)>u.range*.78){let d=dist(u,enemy),step=Math.min(u.speed*dt,Math.max(0,d-u.range*.75));u.x+=(enemy.x-u.x)/d*step;u.y+=(enemy.y-u.y)/d*step}else if(u.cool<=0){damage(enemy,u.damage);u.cool=u.rate}continue}
+   u.target=null;let d=Math.hypot(u.tx-u.x,u.ty-u.y);if(d>3){let step=Math.min(u.speed*dt,d);u.x+=(u.tx-u.x)/d*step;u.y+=(u.ty-u.y)/d*step}
+ }
+ if(aiTimer>8){aiTimer=0;let hq=buildings.find(b=>b.team==='red'&&b.type==='hq'&&alive(b));if(hq){let count=units.filter(u=>u.team==='red'&&alive(u)).length;if(count<9){let type=Math.random()<.28?'tank':'inf';let e=entity(type,'red',hq.x-50,hq.y+(Math.random()-.5)*120);e.tx=220+Math.random()*250;e.ty=worldH/2+(Math.random()-.5)*380;units.push(e)}units.filter(u=>u.team==='red'&&alive(u)).forEach(u=>{u.tx=260+Math.random()*240;u.ty=worldH/2+(Math.random()-.5)*400})}}
+ for(let p of particles){p.t-=dt;p.x+=p.vx*dt;p.y+=p.vy*dt}particles=particles.filter(p=>p.t>0);
+ if(toastTimer>0){toastTimer-=dt;if(toastTimer<=0)$('toast').style.display='none'}
+ income=12+buildings.filter(b=>b.team==='blue'&&b.type==='mine'&&alive(b)).length*8;updateUI();
+}
+function drawEntity(e){let x=e.x,y=e.y;ctx.save();ctx.translate(x,y);
+ let selectedNow=selected.includes(e);
+ if(selectedNow){ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(0,e.r+6,e.r+7,5,0,0,Math.PI*2);ctx.stroke()}
+ if(e.type==='hq'){ctx.fillStyle=e.team==='blue'?'#377f9b':'#9b3d3d';ctx.fillRect(-e.r,-e.r,e.r*2,e.r*2);ctx.fillStyle='#dce9e9';ctx.fillRect(-e.r*.45,-e.r*.6,e.r*.9,e.r*1.2);ctx.fillStyle=e.team==='blue'?colors.blue:colors.red;ctx.fillRect(-e.r*.8,-e.r*.8,e.r*1.6,5)}
+ else if(e.type==='mine'){ctx.fillStyle='#b5a56b';ctx.beginPath();ctx.arc(0,0,e.r,0,Math.PI*2);ctx.fill();ctx.fillStyle='#6e6544';ctx.fillRect(-13,-7,26,14);ctx.fillStyle='#f4d27a';ctx.fillRect(-5,-14,10,28)}
+ else if(e.type==='barracks'){ctx.fillStyle=e.team==='blue'?'#376e85':'#883d3d';ctx.fillRect(-e.r,-e.r*.7,e.r*2,e.r*1.4);ctx.fillStyle='#bacbd0';ctx.fillRect(-10,-e.r*.7,20,e.r*1.4);ctx.fillStyle='#17262d';ctx.fillRect(-e.r*.7,-e.r*.45,e.r*1.4,5)}
+ else if(e.type==='turret'){ctx.fillStyle=e.team==='blue'?'#6b9b9e':'#a95757';ctx.beginPath();ctx.arc(0,0,e.r,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#d9e6e6';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(e.team==='blue'?17:-17,-5);ctx.stroke()}
+ else if(e.type==='tank'){ctx.fillStyle=e.team==='blue'?'#3d9fc2':'#d75e56';ctx.fillRect(-16,-11,32,22);ctx.fillStyle='#263a40';ctx.fillRect(-18,-14,36,5);ctx.fillRect(-18,9,36,5);ctx.fillStyle='#b8d2d8';ctx.fillRect(-3,-5,23,5);ctx.fillStyle='#203139';ctx.fillRect(-2,-7,12,9)}
+ else{ctx.fillStyle=e.team==='blue'?colors.blue:colors.red;ctx.beginPath();ctx.arc(0,0,e.r,0,Math.PI*2);ctx.fill();ctx.fillStyle='#e4eeee';ctx.fillRect(-3,-e.r-4,6,8);ctx.fillStyle='#24383d';ctx.fillRect(-2,-3,12,4)}
+ ctx.restore();
+ let bw=e.type==='hq'?66:e.type==='barracks'?48:32;ctx.fillStyle='#101719';ctx.fillRect(x-bw/2,y-e.r-14,bw,4);ctx.fillStyle=e.team==='blue'?'#65dc9b':'#ff7068';ctx.fillRect(x-bw/2,y-e.r-14,bw*Math.max(0,e.hp/e.maxHp),4);
+}
+function render(){ctx.clearRect(0,0,W,H);ctx.save();ctx.translate(-cam.x,-cam.y);
+ ctx.fillStyle='#294236';ctx.fillRect(0,0,worldW,worldH);
+ // terrain patches and tactical grid
+ for(let x=0;x<worldW;x+=100)for(let y=0;y<worldH;y+=100){ctx.fillStyle=((x/100+y/100)%2===0)?'#2b4538':'#2a4236';ctx.fillRect(x,y,100,100);ctx.strokeStyle='#385444';ctx.lineWidth=1;ctx.strokeRect(x,y,100,100)}
+ // roads
+ ctx.fillStyle='#555c52';ctx.fillRect(0,worldH/2-42,worldW,84);ctx.fillStyle='#9b9b7c';for(let x=0;x<worldW;x+=70)ctx.fillRect(x,worldH/2-2,34,4);
+ // scattered cover
+ for(let i=0;i<24;i++){let x=80+(i*173)%1700,y=75+(i*239)%1150;ctx.fillStyle='#1d352b';ctx.beginPath();ctx.arc(x,y,12+(i%4)*4,0,Math.PI*2);ctx.fill();ctx.fillStyle='#49614a';ctx.beginPath();ctx.arc(x-3,y-4,8+(i%3)*2,0,Math.PI*2);ctx.fill()}
+ for(let e of buildings)if(alive(e))drawEntity(e);for(let u of units)if(alive(u))drawEntity(u);
+ for(let p of particles){ctx.globalAlpha=Math.max(0,p.t);ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,p.y,3+p.t*3,0,Math.PI*2);ctx.fill()}ctx.globalAlpha=1;
+ if(placement){let type=placement;ctx.globalAlpha=.55;ctx.fillStyle='#70e0a0';ctx.beginPath();ctx.arc(cam.x+W/2,cam.y+H/2,type==='mine'?20:type==='barracks'?25:18,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1}
+ ctx.restore();
+ // compass / minimap
+ const mw=Math.min(115,W*.28),mh=mw*worldH/worldW,mx=W-mw-10,my=80;
+ ctx.fillStyle='#101a20c9';ctx.fillRect(mx-4,my-4,mw+8,mh+8);ctx.fillStyle='#294236';ctx.fillRect(mx,my,mw,mh);
+ for(let e of all())if(alive(e)){ctx.fillStyle=e.team==='blue'?'#68c9ed':'#ff6e65';ctx.fillRect(mx+e.x/worldW*mw-2,my+e.y/worldH*mh-2,4,4)}
+ ctx.strokeStyle='#eaf2f3';ctx.strokeRect(mx+cam.x/worldW*mw,my+cam.y/worldH*mh,W/worldW*mw,H/worldH*mh);
+}
+function loop(t){if(!running)return;let dt=Math.min(.04,(t-last)/1000||0);last=t;update(dt);render();if(running)requestAnimationFrame(loop)}
+function handleTap(sx,sy){if(!running||paused||ended)return;let p=screenToWorld(sx,sy);
+ if(placement){let tooClose=buildings.some(b=>alive(b)&&dist(b,p)<b.r+38)||units.some(u=>alive(u)&&dist(u,p)<u.r+25);if(tooClose){notify('Local ocupado — escolha outro ponto');return}
+ let b=entity(placement,'blue',p.x,p.y);buildings.push(b);placement=null;updateUI();return}
+ let hit=all().filter(e=>alive(e)&&dist(e,p)<e.r+9).sort((a,b)=>dist(a,p)-dist(b,p))[0];
+ if(hit&&hit.team==='blue'){selected=[hit];updateUI();return}
+ if(hit&&hit.team==='red'&&selected.length){selected.forEach(u=>{if(units.includes(u)){u.target=hit;u.tx=hit.x;u.ty=hit.y}});return}
+ if(selected.length){selected.forEach(u=>{if(units.includes(u)){u.target=null;u.tx=Math.max(20,Math.min(worldW-20,p.x+(Math.random()-.5)*35));u.ty=Math.max(20,Math.min(worldH-20,p.y+(Math.random()-.5)*35))}})}
+}
+let touchStart=null, twoFinger=null;
+canvas.addEventListener('pointerdown',e=>{e.preventDefault();canvas.setPointerCapture?.(e.pointerId);touchStart={x:e.clientX,y:e.clientY,id:e.pointerId,moved:false};});
+canvas.addEventListener('pointermove',e=>{if(!touchStart||touchStart.id!==e.pointerId)return;let dx=e.clientX-touchStart.x,dy=e.clientY-touchStart.y;if(Math.hypot(dx,dy)>12){touchStart.moved=true;cam.x=Math.max(0,Math.min(worldW-W,cam.x-dx));cam.y=Math.max(0,Math.min(worldH-H,cam.y-dy));touchStart.x=e.clientX;touchStart.y=e.clientY;render()}});
+canvas.addEventListener('pointerup',e=>{if(!touchStart||touchStart.id!==e.pointerId)return;if(!touchStart.moved)handleTap(e.clientX,e.clientY);touchStart=null});
+canvas.addEventListener('contextmenu',e=>e.preventDefault());
+function button(id,fn){$(id).addEventListener('click',()=>{if(!running||ended)return;fn()})}
+button('buildMine',()=>place('mine'));button('buildBarracks',()=>place('barracks'));button('buildTurret',()=>place('turret'));button('trainInf',()=>train('inf'));button('trainTank',()=>train('tank'));
+button('rally',()=>{let h=nearestBlueHQ();if(!h)return;selected.forEach(u=>{u.tx=h.x+70;u.ty=h.y+(Math.random()-.5)*100;u.target=null})});
+button('repair',()=>{if(!cost(80))return;let h=buildings.find(b=>b.team==='blue'&&b.type==='hq'&&alive(b));if(h)h.hp=Math.min(h.maxHp,h.hp+180);notify('Reparos concluídos')});
+button('pause',()=>{paused=!paused;$('pause').innerHTML=paused?'▶ Continuar<span>Jogo</span>':'Ⅱ Pausar<span>Jogo</span>';notify(paused?'Jogo pausado':'Jogo retomado')});
+$('start').onclick=()=>{setup();$('overlay').style.display='none';running=true;last=performance.now();requestAnimationFrame(loop)};
+setup();render();
+})();
+</script>
+</body>
+</html>
